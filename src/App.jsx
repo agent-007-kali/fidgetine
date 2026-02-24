@@ -1,7 +1,73 @@
-import { useState } from 'react'
+import { useState, useCallback, useEffect } from 'react'
+import { loadStripe } from '@stripe/stripe-js'
+import { EmbeddedCheckoutProvider, EmbeddedCheckout } from '@stripe/react-stripe-js'
 import './App.css'
 
+// IMPORTANT: Replace with your actual Stripe Publishable Key
+const stripePromise = loadStripe('pk_test_YOUR_PUBLISHABLE_KEY_HERE')
+
+const ReturnPage = ({ sessionId }) => {
+  const [status, setStatus] = useState(null)
+  const [customerEmail, setCustomerEmail] = useState('')
+
+  useEffect(() => {
+    fetch(`/api/session-status?session_id=${sessionId}`)
+      .then((res) => res.json())
+      .then((data) => {
+        setStatus(data.status)
+        setCustomerEmail(data.customer_email)
+      })
+  }, [sessionId])
+
+  if (status === 'open') {
+    return (
+      <div className="container" style={{ textAlign: 'center', padding: '100px 0' }}>
+        <h2>Payment Incomplete</h2>
+        <button className="btn btn-primary" onClick={() => window.location.href = '/'}>Try Again</button>
+      </div>
+    )
+  }
+
+  if (status === 'complete') {
+    return (
+      <div className="container" style={{ textAlign: 'center', padding: '100px 0' }}>
+        <h2>Payment Successful!</h2>
+        <p>
+          We appreciate your business! A confirmation email will be sent to {customerEmail}.
+        </p>
+        <button className="btn btn-secondary" onClick={() => window.location.href = '/'}>Return Home</button>
+      </div>
+    )
+  }
+
+  return <div style={{ textAlign: 'center', padding: '100px 0' }}>Loading order status...</div>
+}
+
 function App() {
+  const [showCheckout, setShowCheckout] = useState(false);
+  const [sessionId, setSessionId] = useState(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get('session_id');
+  });
+
+  const fetchClientSecret = useCallback(() => {
+    return fetch("/api/create-checkout-session", {
+      method: "POST",
+    })
+      .then((res) => res.json())
+      .then((data) => data.clientSecret);
+  }, []);
+
+  const options = { fetchClientSecret };
+
+  if (sessionId) {
+    return (
+      <div className="app-container">
+        <ReturnPage sessionId={sessionId} />
+      </div>
+    )
+  }
+
   return (
     <div className="app-container">
       {/* Header */}
@@ -132,10 +198,18 @@ function App() {
                 <li><span className="icon">✓</span> Premium carrying case</li>
                 <li><span className="icon">✓</span> 30-day money-back guarantee</li>
               </ul>
-              {/* Stripe Payment Link (Placeholder text, but functional behavior) */}
-              <a href="https://buy.stripe.com/test_abcdef12345" target="_blank" rel="noreferrer" className="btn btn-primary stripe-btn">
-                Checkout with <span className="stripe-logo">Stripe</span>
-              </a>
+              {/* Stripe Embedded Checkout Container */}
+              {showCheckout ? (
+                <div id="checkout">
+                  <EmbeddedCheckoutProvider stripe={stripePromise} options={options}>
+                    <EmbeddedCheckout />
+                  </EmbeddedCheckoutProvider>
+                </div>
+              ) : (
+                <button onClick={() => setShowCheckout(true)} className="btn btn-primary stripe-btn">
+                  Checkout with <span className="stripe-logo">Stripe</span>
+                </button>
+              )}
               <p className="secure-text">🔒 Secure payment processing by Stripe</p>
             </div>
           </div>
