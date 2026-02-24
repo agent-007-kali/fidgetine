@@ -6,19 +6,18 @@ export default async function handler(req, res) {
     if (req.method === 'POST') {
         try {
             const session = await stripe.checkout.sessions.create({
-                ui_mode: 'embedded',
                 line_items: [
                     {
-                        // Provide the exact Price ID (for example, price_1234) of the product you want to sell
-                        price: '{{PRICE_ID}}', // IMPORTANT: Replace with actual Price ID from Stripe Dashboard
+                        price: 'price_1T4URm2diemRbUdrfpmipsxz', // Using the automatically generated Test Price ID
                         quantity: 1,
                     },
                 ],
                 mode: 'payment',
-                return_url: `${req.headers.origin}/return?session_id={CHECKOUT_SESSION_ID}`,
+                success_url: `${req.headers.origin}/?session_id={CHECKOUT_SESSION_ID}`,
+                cancel_url: `${req.headers.origin}/`,
             });
 
-            res.status(200).json({ clientSecret: session.client_secret });
+            res.status(200).json({ url: session.url });
         } catch (err) {
             console.error('Error creating checkout session:', err);
             res.status(err.statusCode || 500).json(err.message);

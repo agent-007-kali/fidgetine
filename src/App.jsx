@@ -1,10 +1,5 @@
 import { useState, useCallback, useEffect } from 'react'
-import { loadStripe } from '@stripe/stripe-js'
-import { EmbeddedCheckoutProvider, EmbeddedCheckout } from '@stripe/react-stripe-js'
 import './App.css'
-
-// IMPORTANT: Replace with your actual Stripe Publishable Key
-const stripePromise = loadStripe('pk_test_YOUR_PUBLISHABLE_KEY_HERE')
 
 const ReturnPage = ({ sessionId }) => {
   const [status, setStatus] = useState(null)
@@ -44,21 +39,28 @@ const ReturnPage = ({ sessionId }) => {
 }
 
 function App() {
-  const [showCheckout, setShowCheckout] = useState(false);
+  const [isCheckoutLoading, setIsCheckoutLoading] = useState(false);
   const [sessionId, setSessionId] = useState(() => {
     const urlParams = new URLSearchParams(window.location.search);
     return urlParams.get('session_id');
   });
 
-  const fetchClientSecret = useCallback(() => {
-    return fetch("/api/create-checkout-session", {
-      method: "POST",
-    })
-      .then((res) => res.json())
-      .then((data) => data.clientSecret);
-  }, []);
-
-  const options = { fetchClientSecret };
+  const handleCheckout = async () => {
+    setIsCheckoutLoading(true);
+    try {
+      const res = await fetch("/api/create-checkout-session", { method: "POST" });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url; // Redirect to Stripe Hosted Checkout
+      } else {
+        console.error("No checkout URL returned", data);
+        setIsCheckoutLoading(false);
+      }
+    } catch (e) {
+      console.error(e);
+      setIsCheckoutLoading(false);
+    }
+  };
 
   if (sessionId) {
     return (
@@ -198,18 +200,14 @@ function App() {
                 <li><span className="icon">✓</span> Premium carrying case</li>
                 <li><span className="icon">✓</span> 30-day money-back guarantee</li>
               </ul>
-              {/* Stripe Embedded Checkout Container */}
-              {showCheckout ? (
-                <div id="checkout">
-                  <EmbeddedCheckoutProvider stripe={stripePromise} options={options}>
-                    <EmbeddedCheckout />
-                  </EmbeddedCheckoutProvider>
-                </div>
-              ) : (
-                <button onClick={() => setShowCheckout(true)} className="btn btn-primary stripe-btn">
-                  Checkout with <span className="stripe-logo">Stripe</span>
-                </button>
-              )}
+              {/* Stripe Hosted Checkout Button */}
+              <button
+                onClick={handleCheckout}
+                className="btn btn-primary stripe-btn"
+                disabled={isCheckoutLoading}
+              >
+                {isCheckoutLoading ? 'Loading...' : <>Checkout with <span className="stripe-logo">Stripe</span></>}
+              </button>
               <p className="secure-text">🔒 Secure payment processing by Stripe</p>
             </div>
           </div>
